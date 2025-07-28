@@ -43,20 +43,33 @@ pipeline {
             }
         }
 
-        stage('Test Application') {
-            steps {
-                script {
-                    sh """
-                        docker exec ${APP_CONTAINER_NAME} sh -c 'apk add --no-cache curl || apt-get update && apt-get install -y curl'
-                        docker exec ${APP_CONTAINER_NAME} sh -c '
-                            STATUS_CODE=\$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/)
-                            echo "Status code: \$STATUS_CODE"
-                            [ "\$STATUS_CODE" -ne 200 ] && exit 1 || exit 0
-                        '
-                    """
-                }
-            }
+stage('Test Application') {
+    steps {
+        script {
+            sh """
+                docker exec ${APP_CONTAINER_NAME} sh -c '
+                    if command -v curl > /dev/null; then
+                        echo "curl already installed";
+                    else
+                        apt-get update && apt-get install -y curl;
+                    fi
+                '
+
+                docker exec ${APP_CONTAINER_NAME} sh -c '
+                    STATUS_CODE=\$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/)
+                    echo "Status code: \$STATUS_CODE"
+                    if [ "\$STATUS_CODE" -ne 200 ]; then
+                        echo "❌ Unexpected response code"
+                        exit 1
+                    else
+                        echo "✅ Application running correctly"
+                        exit 0
+                    fi
+                '
+            """
         }
+    }
+}
 
         stage('Archive HTML Response') {
             steps {
